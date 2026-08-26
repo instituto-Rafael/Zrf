@@ -1,0 +1,108 @@
+name: Reproducible ZRF Mathematics Core Receipt
+
+on:
+  push:
+    branches:
+      - main
+      - audit/reproducible-mathematics-core-v1-20260826
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reproducible-mathematics-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce:
+    name: Reproduce mathematics registry + sample verifier
+    runs-on: ubuntu-24.04
+    container:
+      image: python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+    env:
+      REPRO_CONTAINER_IMAGE: python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+      REPRO_CHECKOUT_SHA: 11d5960a326750d5838078e36cf38b85af677262
+      REPRO_UPLOAD_ARTIFACT_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+
+    steps:
+      - name: Checkout immutable action revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Compile Python core and verifier
+        id: compile
+        shell: sh
+        run: |
+          set -eu
+          python3 -m py_compile src/mathematics.py scripts/verify_mathematics.py scripts/write_repro_receipt.py
+
+      - name: Validate exact 69-slot operation registry
+        id: registry
+        shell: sh
+        run: |
+          set -eu
+          PYTHONPATH="$PWD/src" python3 - <<'PY'
+          from mathematics import get_all_operations
+          ops = get_all_operations()
+          assert len(ops) == 69, len(ops)
+          assert sorted(ops) == list(range(1, 70))
+          assert all(callable(ops[i][1]) for i in range(1, 70))
+          names = [ops[i][0] for i in range(1, 70)]
+          assert len(set(names)) == 69
+          print('PASS registry_69_slots unique_names=69 callable=69')
+          PY
+
+      - name: Run repository mathematics verifier
+        id: verify
+        shell: sh
+        run: |
+          set -eu
+          mkdir -p artifacts/reproducibility
+          python3 scripts/verify_mathematics.py | tee artifacts/reproducibility/verifier.out
+          grep -F "ALL TESTS PASSED" artifacts/reproducibility/verifier.out >/dev/null
+
+      - name: Emit machine-readable receipt
+        id: receipt
+        if: ${{ always() }}
+        shell: sh
+        env:
+          GATE_COMPILE: ${{ steps.compile.outcome }}
+          GATE_REGISTRY: ${{ steps.registry.outcome }}
+          GATE_VERIFY: ${{ steps.verify.outcome }}
+        run: |
+          set -eu
+          python3 scripts/write_repro_receipt.py
+          python3 -m json.tool artifacts/reproducibility/zrf-mathematics-core-receipt.json >/dev/null
+          sha256sum artifacts/reproducibility/zrf-mathematics-core-receipt.json > artifacts/reproducibility/zrf-mathematics-core-receipt.json.sha256
+
+      - name: Upload HEAD-bound mathematics evidence
+        id: upload
+        if: ${{ always() && steps.receipt.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zrf-mathematics-core-receipt-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/reproducibility/zrf-mathematics-core-receipt.json
+            artifacts/reproducibility/zrf-mathematics-core-receipt.json.sha256
+            artifacts/reproducibility/verifier.out
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+      - name: Bind artifact digest to run summary
+        if: ${{ always() && steps.upload.outcome == 'success' }}
+        shell: sh
+        run: |
+          {
+            echo "### ZRF mathematics reproducibility receipt"
+            echo "- head: \`${GITHUB_SHA}\`"
+            echo "- run: \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\`"
+            echo "- artifact digest: \`${{ steps.upload.outputs.artifact-digest }}\`"
+            echo "- operation slots: \`69/69\`"
+            echo "- all 69 formulas exhaustively proven: \`false\`"
+          } >> "$GITHUB_STEP_SUMMARY"
