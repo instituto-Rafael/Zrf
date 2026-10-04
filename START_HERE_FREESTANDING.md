@@ -1,6 +1,6 @@
 # START HERE — ZRF clean-room freestanding bit image V1
 
-Status: `IMPLEMENTED_LOCAL_PREFLIGHT_PASS / REMOTE_CI_REQUIRES_RECEIPT / PHYSICAL_BOOT_TOKEN_VAZIO`
+Status: `IMPLEMENTED_LOCAL_PREFLIGHT_PASS / REMOTE_CI_REEXECUTING / PHYSICAL_BOOT_TOKEN_VAZIO`
 
 ## Intention
 
@@ -26,7 +26,7 @@ Producer authority: `instituto-Rafael/Zrf`.
 
 Observation-only references:
 
-- `rafaelmeloreisnovo/runner-images_RAFCODE`: image/build/release concepts only; no source code imported.
+- `rafaelmeloreisnovo/runner-images_RAFCODE`: image/build/release and declared runner-tool inventory only; no source code imported.
 - `rafaelmeloreisnovo/actions`: orchestration/provenance concepts only; inherited code remains third-party.
 - `rafaelmeloreisnovo/Est-dio-de-udio`: consumer/use-case reference only; no source code imported.
 
@@ -86,8 +86,10 @@ aarch64 artifact        = no dynamic dependency / no undefined symbol
 armv7 artifact          = no dynamic dependency / no undefined symbol
 ```
 
-The build toolchain is a **factory dependency**, not a runtime dependency. V1 emits both ELF and raw BIN with `ld.lld`, reducing target-specific factory tooling. Compiler/linker provenance remains separate from the produced image.
+The build toolchain is a **factory dependency**, not a runtime dependency. V1 emits both ELF and raw BIN with LLD, reducing target-specific factory tooling. Compiler/linker provenance remains separate from the produced image.
 
 ## Remote execution history
 
-The first GitHub run reached the runner and executed the build step but failed there. Its uploaded `freestanding-build.log` was empty because stderr was not captured. Therefore the precise source cause of that run remains `TOKEN_VAZIO`; it is not promoted to an objcopy diagnosis or to a source-code failure without evidence.
+1. Initial run: runner/checkout/tool-inventory executed, build failed, but the artifact log was empty because stderr was not captured. Exact root cause for that first run remains `TOKEN_VAZIO`.
+2. Observability hotfix run: stderr was captured and proved `ld.lld: not found` in the build environment.
+3. Runner-image inventory declares Clang 16/17/18 and Android NDK roots. The build now resolves LLD from explicit override, PATH, preinstalled Android NDK, or `/usr/lib/llvm-*`, without installing a package and without adding a runtime dependency to the produced image.

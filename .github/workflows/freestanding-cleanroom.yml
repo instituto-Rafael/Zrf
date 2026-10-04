@@ -33,15 +33,18 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Inventory factory toolchain
+      - name: Inventory factory toolchain without masked pipelines
         shell: sh
         run: |
           set -eu
-          clang --version | head -1
-          ld.lld --version | head -1
-          readelf --version | head -1
-          nm --version | head -1
-          sha256sum --version | head -1
+          command -v clang
+          clang --version > factory-clang-version.txt
+          sed -n '1p' factory-clang-version.txt
+          command -v readelf
+          command -v nm
+          command -v sha256sum
+          printf 'ANDROID_NDK=%s\n' "${ANDROID_NDK:-TOKEN_VAZIO}"
+          printf 'ANDROID_NDK_LATEST_HOME=%s\n' "${ANDROID_NDK_LATEST_HOME:-TOKEN_VAZIO}"
 
       - name: Build clean-room artifacts and run semantic self-test
         shell: sh
@@ -87,6 +90,7 @@ jobs:
             freestanding/out/*/*.elf
             freestanding/out/*/*.bin
             freestanding-build.log
+            factory-clang-version.txt
           if-no-files-found: error
           compression-level: 0
           retention-days: 90

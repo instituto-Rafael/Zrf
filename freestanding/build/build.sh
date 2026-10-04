@@ -7,7 +7,52 @@ mkdir -p "$OUT/x86_64" "$OUT/aarch64" "$OUT/armv7" "$OUT/host"
 
 CC_HOST=${CC_HOST:-cc}
 CLANG=${CLANG:-clang}
-LD_LLD=${LD_LLD:-ld.lld}
+
+resolve_lld() {
+  if [ -n "${LD_LLD:-}" ]; then
+    if [ -x "$LD_LLD" ]; then
+      printf '%s\n' "$LD_LLD"
+      return 0
+    fi
+    if command -v "$LD_LLD" >/dev/null 2>&1; then
+      command -v "$LD_LLD"
+      return 0
+    fi
+  fi
+
+  if command -v ld.lld >/dev/null 2>&1; then
+    command -v ld.lld
+    return 0
+  fi
+
+  for ndk_root in "${ANDROID_NDK:-}" "${ANDROID_NDK_HOME:-}" "${ANDROID_NDK_LATEST_HOME:-}" "${ANDROID_NDK_ROOT:-}"; do
+    if [ -n "$ndk_root" ]; then
+      candidate="$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld"
+      if [ -x "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    fi
+  done
+
+  for candidate in /usr/lib/llvm-*/bin/ld.lld; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+LD_LLD=$(resolve_lld) || {
+  echo "factory linker unavailable: no executable ld.lld found in PATH, Android NDK roots, or /usr/lib/llvm-*" >&2
+  exit 127
+}
+
+echo "factory.clang=$(command -v "$CLANG")"
+echo "factory.ld_lld=$LD_LLD"
+"$LD_LLD" --version | sed -n '1p'
 
 "$CC_HOST" -std=c11 -Wall -Wextra -Werror -I"$ROOT/include" \
   "$ROOT/src/zrf_bits.c" "$ROOT/tests/host_selftest.c" -o "$OUT/host/zrf_host_selftest"
@@ -27,8 +72,6 @@ build_target() {
   "$LD_LLD" -m "$emulation" -T "$ROOT/linker/$name.ld" --build-id=none \
     -o "$OUT/$name/zrf-$name.elf" "$OUT/$name/start.o" "$OUT/$name/zrf_bits.o"
 
-  # Generate the raw machine image with the same linker rather than a
-  # target-specific objcopy. This shrinks the factory dependency surface.
   "$LD_LLD" -m "$emulation" -T "$ROOT/linker/$name.ld" --build-id=none \
     --oformat=binary -o "$OUT/$name/zrf-$name.bin" \
     "$OUT/$name/start.o" "$OUT/$name/zrf_bits.o"
