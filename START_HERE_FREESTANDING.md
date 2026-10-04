@@ -1,6 +1,6 @@
 # START HERE — ZRF clean-room freestanding bit image V1
 
-Status: `IMPLEMENTED_LOCAL_PREFLIGHT_PASS / REMOTE_CI_PENDING / PHYSICAL_BOOT_TOKEN_VAZIO`
+Status: `IMPLEMENTED_LOCAL_PREFLIGHT_PASS / REMOTE_CI_REQUIRES_RECEIPT / PHYSICAL_BOOT_TOKEN_VAZIO`
 
 ## Intention
 
@@ -86,4 +86,8 @@ aarch64 artifact        = no dynamic dependency / no undefined symbol
 armv7 artifact          = no dynamic dependency / no undefined symbol
 ```
 
-The build toolchain is a **factory dependency**, not a runtime dependency. Compiler/linker provenance must remain recorded separately from the produced image.
+The build toolchain is a **factory dependency**, not a runtime dependency. V1 emits both ELF and raw BIN with `ld.lld`, reducing target-specific factory tooling. Compiler/linker provenance remains separate from the produced image.
+
+## Remote execution history
+
+The first GitHub run reached the runner and executed the build step but failed there. Its uploaded `freestanding-build.log` was empty because stderr was not captured. Therefore the precise source cause of that run remains `TOKEN_VAZIO`; it is not promoted to an objcopy diagnosis or to a source-code failure without evidence.

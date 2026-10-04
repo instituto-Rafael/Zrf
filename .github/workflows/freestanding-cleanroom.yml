@@ -39,16 +39,17 @@ jobs:
           set -eu
           clang --version | head -1
           ld.lld --version | head -1
-          if command -v llvm-objcopy >/dev/null 2>&1; then llvm-objcopy --version | head -1; else objcopy --version | head -1; fi
           readelf --version | head -1
           nm --version | head -1
+          sha256sum --version | head -1
 
       - name: Build clean-room artifacts and run semantic self-test
         shell: sh
         run: |
           set -eu
-          ./freestanding/build/build.sh | tee freestanding-build.log
+          ./freestanding/build/build.sh 2>&1 | tee freestanding-build.log
           grep -F 'host_semantic_selftest=PASS' freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
+          grep -F 'raw_image_emitter=ld.lld' freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
           grep -F 'physical_boot=TOKEN_VAZIO' freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
           for arch in x86_64 aarch64 armv7; do
             grep -F "arch.$arch.interpreter=NONE" freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
@@ -70,6 +71,9 @@ jobs:
               echo '```'
             else
               echo '- receipt: `TOKEN_VAZIO`'
+            fi
+            if [ -f freestanding-build.log ]; then
+              echo "- build log bytes: \`$(wc -c < freestanding-build.log | tr -d ' ')\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
