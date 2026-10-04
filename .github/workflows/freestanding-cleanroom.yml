@@ -1,0 +1,88 @@
+name: ZRF Clean-room Freestanding Bit Images
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'START_HERE_FREESTANDING.md'
+      - 'freestanding/**'
+      - '.github/workflows/freestanding-cleanroom.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'START_HERE_FREESTANDING.md'
+      - 'freestanding/**'
+      - '.github/workflows/freestanding-cleanroom.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zrf-freestanding-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cleanroom:
+    name: Build + inspect x86_64 / AArch64 / ARMv7
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout immutable action revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Inventory factory toolchain
+        shell: sh
+        run: |
+          set -eu
+          clang --version | head -1
+          ld.lld --version | head -1
+          if command -v llvm-objcopy >/dev/null 2>&1; then llvm-objcopy --version | head -1; else objcopy --version | head -1; fi
+          readelf --version | head -1
+          nm --version | head -1
+
+      - name: Build clean-room artifacts and run semantic self-test
+        shell: sh
+        run: |
+          set -eu
+          ./freestanding/build/build.sh | tee freestanding-build.log
+          grep -F 'host_semantic_selftest=PASS' freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
+          grep -F 'physical_boot=TOKEN_VAZIO' freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
+          for arch in x86_64 aarch64 armv7; do
+            grep -F "arch.$arch.interpreter=NONE" freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
+            grep -F "arch.$arch.needed=NONE" freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
+            grep -F "arch.$arch.undefined_symbols=0" freestanding/out/FREESTANDING_RECEIPT.txt >/dev/null
+          done
+
+      - name: Bind receipt to run summary
+        if: ${{ always() }}
+        shell: sh
+        run: |
+          {
+            echo '### ZRF clean-room freestanding receipt'
+            echo "- head: \`${GITHUB_SHA}\`"
+            echo "- run: \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\`"
+            if [ -f freestanding/out/FREESTANDING_RECEIPT.txt ]; then
+              echo '```text'
+              cat freestanding/out/FREESTANDING_RECEIPT.txt
+              echo '```'
+            else
+              echo '- receipt: `TOKEN_VAZIO`'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence and machine images
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zrf-freestanding-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            freestanding/out/FREESTANDING_RECEIPT.txt
+            freestanding/out/*/*.elf
+            freestanding/out/*/*.bin
+            freestanding-build.log
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
