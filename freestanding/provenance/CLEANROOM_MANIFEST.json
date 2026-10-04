@@ -1,0 +1,46 @@
+{
+  "schema": "ZRF_CLEANROOM_MANIFEST_V1",
+  "authority": "instituto-Rafael/Zrf",
+  "target": "freestanding bit-image lane",
+  "claim_allowed": false,
+  "sources_observed": [
+    {
+      "ref": "rafaelmeloreisnovo/runner-images_RAFCODE",
+      "role": "observation_only",
+      "allowed": ["image lifecycle", "architecture explicitness", "build-vs-runtime separation"],
+      "copied_code": false
+    },
+    {
+      "ref": "rafaelmeloreisnovo/actions",
+      "role": "observation_only",
+      "allowed": ["orchestration separation", "provenance boundary"],
+      "copied_code": false
+    },
+    {
+      "ref": "rafaelmeloreisnovo/Est-dio-de-udio",
+      "role": "consumer_reference_only",
+      "allowed": ["deterministic low-level execution use case"],
+      "copied_code": false
+    }
+  ],
+  "authored_paths": [
+    "START_HERE_FREESTANDING.md",
+    "freestanding/CLEANROOM_BOUNDARY.md",
+    "freestanding/spec/ZRF_NIBBLE_MACHINE_V1.md",
+    "freestanding/include/zrf_bits.h",
+    "freestanding/src/zrf_bits.c",
+    "freestanding/arch/x86_64/start.S",
+    "freestanding/arch/aarch64/start.S",
+    "freestanding/arch/armv7/start.S",
+    "freestanding/linker/x86_64.ld",
+    "freestanding/linker/aarch64.ld",
+    "freestanding/linker/armv7.ld",
+    "freestanding/tests/host_selftest.c",
+    "freestanding/build/build.sh"
+  ],
+  "runtime_dependencies_expected": 0,
+  "factory_dependencies": ["C compiler for hosted self-test", "clang", "ld.lld", "llvm-objcopy or compatible objcopy", "readelf", "nm", "sha256sum"],
+  "physical_boot_receipt": "TOKEN_VAZIO",
+  "remote_ci_receipt": "TOKEN_VAZIO",
+  "promotion_rule": "No physical-independence claim before an architecture-specific execution receipt exists."
+}
